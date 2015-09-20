@@ -37,7 +37,7 @@ def draw_x_axis(y, screen):
     '''
     draw x axis at height y
     '''
-    screen.hline(y, 0, '_', screen.getmaxyx()[1])
+    screen.hline(y, 0, '-', screen.getmaxyx()[1])
 
 def draw_y_axis(x, screen):
     '''
@@ -51,15 +51,27 @@ def draw_origin(y, x, screen):
     '''
     screen.addch(y, x, '+')
 
-def plot_point(y, x, screen, c='.', color=255):
+def plot_point(y, x, screen, c='.', color=255, fill=False):
     '''
     plots (y, x) where y and x are coordinates with respect to the axes
     '''
     max_y, max_x = screen.getmaxyx()
-    screen.addch(int(round(max_y-(y+max_y/2))), int(x+(max_x/2)), c, curses.color_pair(color))
+    oy, ox = int(max_y/2), int(max_x/2)
+    if max_y%2==1:
+        oy+=1
+    if max_x%2==1:
+        ox+=1
+    plot_y = int(round(max_y-(y+max_y/2)))
+    plot_x = int(x+(max_x/2))
+    screen.addch(plot_y, plot_x, c, curses.color_pair(color))
 
-def plot_abs_point(y, x, screen, c='.', color=255):
-    screen.addch(y, x, c, curses.color_pair(color))
+    if fill:
+        if plot_y > oy:
+            for i in range(0, plot_y-oy):
+                screen.addch(oy+i, plot_x, c, curses.color_pair(color))
+        else:
+            for i in range(0, oy-plot_y):
+                screen.addch(plot_y+i+1, plot_x, c, curses.color_pair(color))
 
 def message(m, screen, color=51, y=5):
     start_x = (screen.getmaxyx()[1]/2)-int(len(m)/2)
@@ -71,6 +83,7 @@ if __name__ == '__main__':
     argparser.add_argument("-p", "--point", help="char for your point")
     argparser.add_argument("-c", "--color", help="xterm-256 color (0-255)", type=int)
     argparser.add_argument("-t", "--timestep", help="determines the speed of the graph output", type=float)
+    argparser.add_argument("-f", "--fill", help="fills the graph if on", action="store_true")
     args = argparser.parse_args()
 
     scr = curses.initscr()
@@ -89,7 +102,7 @@ if __name__ == '__main__':
 
     code = parser.expr(eq).compile()
     color = 255
-    timestep = 0.1
+    timestep = 0.001
     max_y_axis = max_y
     max_x_axis = max_x
     point = '.'
@@ -121,8 +134,7 @@ if __name__ == '__main__':
                     scr.addch(j, i, ' ')
             try:
                 y = eval(code)
-                plot_point(y, x, scr, point, color)
-
+                plot_point(y, x, scr, point, color, fill=args.fill)
                 scr.addstr(0, 0, "("+str(x)+", "+str(y)+")", curses.color_pair(51))
             except ValueError:
                 scr.addstr(0, 0, "(ValueError, "+str(x)+")", curses.color_pair(199))
