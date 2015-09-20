@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 import curses
-import math
+from math import *
 import time
-import random
+import sys
+import parser
+import argparse
 
 def init_curses(screen):
     '''
     load my preferred curses defaults
     '''
-
     curses.start_color()
     curses.noecho()
     curses.cbreak()
     screen.keypad(1)
-
 
 def init_colors():
     '''
@@ -31,71 +31,70 @@ def end_curses(screen):
     curses.echo()
     curses.endwin()
 
-def draw_x_axis(y0, screen):
+def draw_x_axis(y, screen):
     '''
-    draw the x axis at height y0
+    draw x axis at height y
     '''
-    for i in range(screen.getmaxyx()[1]):
-        screen.addch(y0, i, "-" , curses.color_pair(0))
+    screen.hline(y, 0, '-', screen.getmaxyx()[1])
 
-def draw_bar(y0, x0, y, screen, c="#", color=0):
+def draw_y_axis(x, screen):
     '''
-    draw a bar starting at x0, y0 with height y on screen with char c in chosen color
+    draw y axis at location x
     '''
-    if y < 0:
-        y = 0-y
-        for i in range(y+1):
-            screen.addch(min(y0+i, screen.getmaxyx()[0]), x0, c, curses.color_pair(color))
-    else:
-        for i in range(y+1):
-            screen.addch(max(y0-i, 0), x0, c, curses.color_pair(color))
+    screen.vline(0, x, '|', screen.getmaxyx()[0])
 
-def draw_wide_bar(y0, x0, y, x, screen, c="#", color=0):
+def draw_origin(y, x, screen):
     '''
-    draw a bar with width x
+    mark the origin down
     '''
-    for i in range(x):
-        draw_bar(y0, min(x0+i, screen.getmaxyx()[1]), y, screen, c, color)
+    screen.addch(y, x, '+')
 
-def color_select(n, threshold):
+def plot_point(y, x, screen, c='.', color=255):
     '''
-    given a value and 4-division threshold, return blue, green, yellow, or red
+    plots (y, x) where y and x are coordinates with respect to the axes
     '''
-    if n < threshold[0]:
-        return 33
-    elif n < threshold[1]:
-        return 83
-    elif n < threshold[2]:
-        return 119
-    elif n < threshold[3]:
-        return 227
-    else:
-        return 197
+    max_y, max_x = screen.getmaxyx()
+    screen.addch(max_y-(y+int(max_y/2)), x+(int(max_x/2)), c, curses.color_pair(color))
 
-
-def draw_line(y0, x0, y1, x1, scr, c='.', color=255):
-    x0, x1 = min(x0, x1), max(x0, x1)
-    y0, y1 = min(y0, y1), max(y0, y1)
-    if x0 == x1:
-        return
-
-    m = int((y1-y0) / (x1-x0))
-
-    for i in range(0, x1-x0):
-        scr.addch(y0 + (i*m), x0+ i, c, curses.color_pair(color))
-
+def plot_abs_point(y, x, screen, c='.', color=255):
+    screen.addch(y, x, c, curses.color_pair(color))
 
 if __name__ == '__main__':
     scr = curses.initscr()
     init_curses(scr)
     init_colors()
 
-    maxy, maxx = scr.getmaxyx()
-    oy = maxy/2
-    ox = maxx/2
+    max_y, max_x = scr.getmaxyx()
+    oy = int(max_y/2)
+    ox = int(max_x/2)
+    eq = sys.argv[1]
+    code = parser.expr(eq).compile()
 
-    draw_line(oy, ox, oy-10, ox-10, scr, "*", 197)
+
+    t = -ox
+    while t <= ox-1:
+        scr.clear()
+        draw_x_axis(oy, scr)
+        draw_y_axis(ox, scr)
+        draw_origin(oy, ox, scr)
+
+        for x in range(-ox, t):
+            try:
+                y = int(eval(code))
+                plot_point(y, x, scr, '.', 199)
+                scr.addstr(0, 0, "("+str(x)+", "+str(y)+")", curses.color_pair(51))
+            except ValueError:
+                plot_abs_point(0, ox, scr, '|', 199)
+                scr.addstr(0, 0, "(ValueError, "+str(x)+")", curses.color_pair(199))
+            except:
+                plot_abs_point(0, ox, scr, '|', 199)
+                scr.addstr(0, 0, "("+str(y)+", "+str(x)+")", curses.color_pair(199))
+
+        plot_point(0, t, scr, '|', 199)
+        t+=1
+        time.sleep(0.1)
+        scr.refresh()
+
 
     scr.getch()
-
     end_curses(scr)
