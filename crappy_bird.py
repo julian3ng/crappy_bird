@@ -61,7 +61,7 @@ def draw_wide_bar(y0, x0, y, x, screen, c="#", color=0):
     for i in range(x):
         draw_bar(y0, (x0+i)%(screen.getmaxyx()[1]-1), y, screen, c, color)
 
-def draw_character(y, x, screen, score, c='>', color=82):
+def draw_character(y, x, screen, c='>', color=82):
     screen.addstr(y, x, c, curses.color_pair(color))
 
 
@@ -97,6 +97,11 @@ def splash_screen(y, x, screen):
     screen.getch()
     screen.nodelay(1)
 
+def pause(y, x):
+    scr.nodelay(0)
+    scr.addstr(y, x, "Paused", curses.color_pair(51))
+    if scr.getch() != -1:
+        scr.nodelay(1)
 
 if __name__ == '__main__':
     scr = curses.initscr()
@@ -113,6 +118,7 @@ if __name__ == '__main__':
     t = 0
     time_inc = 0.07
     vel_y = 0
+
     acc_y = 0.5
     flap_vel = -2
     obstacle_char = '#'
@@ -122,6 +128,11 @@ if __name__ == '__main__':
     gap_width = 10
     obstacles = []
     spacing = 25
+    noclip = False
+    birds = 1
+    multibird = True
+    prev_pos = [y]*birds
+
 
     for i in range(0, 9):
         obstacles.append([i*spacing, int(max_y/2)+10, int(max_y/2)-10])
@@ -129,23 +140,44 @@ if __name__ == '__main__':
     splash_screen(oy, ox, scr)
     while 1:
         try:
+            in_char = scr.getch()
+            if (in_char == ord(' ')):
+                vel_y = flap_vel
+            elif (in_char == ord('p')):
+                pause(oy, ox-len("Paused"))
+            elif (in_char == ord('n')):
+                noclip = not noclip
+            elif (in_char == ord('m')):
+                multibird = not multibird
+
             scr.clear()
             #jump!
-            in_char = scr.getch()
-            if (in_char != -1):
-                vel_y = flap_vel
 
             #update vars
             vel_y = apply_gravity(vel_y, acc_y)
             y = apply_velocity(vel_y, y)
+
             t += 1
+            birds = t / 100 + 1
+            score = birds * t
             #out of bounds
             if (y >= max_y) or (y <= 0):
                 death(oy, ox, t)
                 break
             else:
                 #keep going
-                draw_character(int(y), int(max_x / 3), scr, t)
+                #scr.vline(0, int(max_x/3), '|', max_y-1) #debug var
+                prev_pos = [int(y)] + prev_pos[:birds]
+
+                scr.addstr(3, 3, str(prev_pos))
+
+                if multibird:
+                    for i in range(birds):
+                        draw_character(prev_pos[i], int(max_x/3)-i, scr)
+                else:
+                    draw_character(int(y), int(max_x / 3), scr)
+
+
 
                 if t%100 == 0:
                     gap_width -= 1
@@ -164,11 +196,27 @@ if __name__ == '__main__':
                     draw_wide_bar(x[2], x[0] - t, x[2], 4, scr, obstacle_char, 197)
 
                 scr.addstr(max_y-3, max_x-len(str(t))-3, str(t), curses.color_pair(51))
+                if noclip:
+                    scr.addstr(max_y-2, max_x-len("NOCLIP"), "NOCLIP", curses.color_pair(199))
 
                 # collision check
-                if (scr.inch(int(y), int(max_x / 3)) & 0b11111111 == ord(obstacle_char)): # last 8 digits are the char
-                    death(oy, ox, t)
-                    break
+                if not multibird:
+                    if (not noclip) and (scr.inch(int(y), int(max_x / 3)) & 0b11111111 == ord(obstacle_char)): # last 8 digits are the char
+                        death(oy, ox, score)
+                        break
+                else:
+                    if (not noclip):
+                        d = False
+                        for i, p in enumerate(prev_pos):
+                            if (scr.inch(p, int(max_x/3)-i) & 0b11111111 == ord(obstacle_char)):
+                                d = True
+                                death(oy, ox, score)
+
+                                break
+                        if d:
+                            break
+
+
                 if (scr.instr(2, 0, 5) == "#### "):
                     obstacles.append([obstacles[-1][0]+spacing, 0, 0])
                 if (scr.instr(2, max_x-6, 5) == "#### "):
@@ -177,5 +225,5 @@ if __name__ == '__main__':
                 time_inc = max(0.07, 2-math.log(t+5))
                 time.sleep(time_inc)
         except KeyboardInterrupt:
-            death(oy, ox, t)
+            death(oy, ox, score)
             break
