@@ -85,13 +85,18 @@ def death(y, x, score=0):
     scr.getch()
     end_curses(scr)
     with open('scores.txt', 'a') as out:
-        out.write(str(score))
+        out.write(str(score)+"\n")
 
 
-def pause():
-    scr.nodelay(0)
-    scr.getch()
-    scr.nodelay(1)
+def splash_screen(y, x, screen):
+    screen.nodelay(0)
+    welcome = "CRAPPY BIRD"
+    start = "Press any key to start."
+    screen.addstr(y, x-(len(welcome)/2), welcome, curses.color_pair(199))
+    screen.addstr(y+1, x-(len(start)/2), start, curses.color_pair(51))
+    screen.getch()
+    screen.nodelay(1)
+
 
 if __name__ == '__main__':
     scr = curses.initscr()
@@ -121,6 +126,7 @@ if __name__ == '__main__':
     for i in range(0, 9):
         obstacles.append([i*spacing, int(max_y/2)+10, int(max_y/2)-10])
 
+    splash_screen(oy, ox, scr)
     while 1:
         try:
             scr.clear()
